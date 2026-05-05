@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Monitor para Distribución | Control de Flota</title>
+    
+    <!-- Librerías externas (CSS y JS) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="/static/estilos.css?v=2026">
+</head>
+<body>
+
+<nav class="nav">
+    <div class="nav-logo">DISTRIBUTION MONITOR<span>| FLOTA</span></div>
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="gotoView('operativa',this)">PANEL</button>
+        <button class="nav-tab" onclick="gotoView('mapa',this)">MAPA GPS</button>
+        <button class="nav-tab" onclick="gotoView('agenda',this)">AGENDA</button>
+        <button class="nav-tab" onclick="gotoView('admin',this)">ADMIN</button>
+    </div>
+    <div class="nav-right">
+        <div id="conn-status" class="status-pill"><div class="dot"></div><span>Conectado</span></div>
+        <div class="clock" id="clock">--:--:--</div>
+    </div>
+</nav>
+<div class="prog-wrap"><div class="prog-bar" id="prog"></div></div>
+<div id="toast"></div>
+
+<!-- MODAL DÍA -->
+<div class="modal-overlay" id="modal-dia" onclick="if(event.target===this)cerrarModal()">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="modal-dia-titulo">—</div>
+            <button class="modal-close" onclick="cerrarModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-dia-body"></div>
+        <div class="modal-footer">
+            <button class="btn-sm" onclick="agregarEntradaModal()">+ Agregar entrega</button>
+            <button class="btn btn-primary" onclick="guardarModal()">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<div class="views">
+
+    <!-- PANEL OPERATIVO -->
+    <div class="view active" id="view-operativa">
+        <div style="margin-bottom:12px;display:flex;align-items:baseline;justify-content:space-between;">
+            <div>
+                <h1 style="font-size:22px;font-weight:800;letter-spacing:-0.02em;">Panel de Control</h1>
+                <p style="font-size:12px;color:var(--text3);font-family:var(--mono);" id="p1-fecha"></p>
+            </div>
+            <button class="export-btn" onclick="exportarCSV()">⬇ Exportar CSV</button>
+        </div>
+        <div id="alertas-bar"></div>
+        <div class="kpi-row">
+            <div class="kpi" style="--kpi-accent:var(--accent)"><div class="kpi-label">Pedidos Hoy</div><div class="kpi-value info" id="k-total">—</div><div class="kpi-sub">Total del día</div></div>
+            <div class="kpi" style="--kpi-accent:var(--success)"><div class="kpi-label">Entregados</div><div class="kpi-value success" id="k-ent">—</div><div class="kpi-sub" id="k-ent-sub">—</div></div>
+            <div class="kpi" style="--kpi-accent:var(--warning)"><div class="kpi-label">Pendientes</div><div class="kpi-value warning" id="k-pend">—</div><div class="kpi-sub">Sin confirmar</div></div>
+            <div class="kpi" style="--kpi-accent:var(--danger)"><div class="kpi-label">No Entregados</div><div class="kpi-value danger" id="k-noent">—</div><div class="kpi-sub" id="k-parc-sub">—</div></div>
+            <div class="kpi" style="--kpi-accent:var(--hoy)"><div class="kpi-label">Cumplimiento</div><div class="kpi-value" id="k-pct">—</div><div class="kpi-sub">Meta 85%</div></div>
+            <div class="kpi" style="--kpi-accent:var(--info)"><div class="kpi-label">Móviles Activos</div><div class="kpi-value info" id="k-mov">—</div><div class="kpi-sub" id="k-mov-sub">—</div></div>
+        </div>
+        <div class="chart-row">
+            <div class="chart-wrap">
+                <div class="chart-header"><div class="chart-title">Evolución del Día — Entregas</div></div>
+                <div class="chart-canvas-wrap"><canvas id="chart-evolucion"></canvas></div>
+            </div>
+            <div class="chart-wrap">
+                <div class="chart-header"><div class="chart-title">Distribución por Estado</div></div>
+                <div class="chart-canvas-wrap"><canvas id="chart-estados"></canvas></div>
+            </div>
+        </div>
+        <div class="filtros-row">
+            <button class="filtro-btn active" id="f-todos" onclick="setFiltro('todos',this)">TODOS</button>
+            <button class="filtro-btn f-en-ruta" id="f-en-ruta" onclick="setFiltro('en-ruta',this)">EN RUTA</button>
+            <button class="filtro-btn f-detenido" id="f-detenido" onclick="setFiltro('detenido',this)">DETENIDO</button>
+            <button class="filtro-btn f-retrasado" id="f-retrasado" onclick="setFiltro('retrasado',this)">RETRASADO</button>
+            <input class="search-input" id="search-movil" type="text" placeholder="Buscar móvil o chofer..." oninput="renderMoviles()">
+        </div>
+        <div class="main-grid">
+            <div class="card">
+                <div class="card-title">Estado de Flota</div>
+                <div class="moviles-grid" id="moviles-grid"></div>
+            </div>
+            <div class="card">
+                <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>Clientes — Movimientos del Día</span>
+                    <input class="search-input" id="search-cliente" style="max-width:150px;margin-bottom:0;" type="text" placeholder="Buscar cliente..." oninput="renderClientes()">
+                </div>
+                <table class="tbl">
+                    <thead><tr><th>Cliente</th><th>Total</th><th>Entregado</th><th>Estado</th></tr></thead>
+                    <tbody id="clientes-tbl"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAPA GPS -->
+    <div class="view" id="view-mapa">
+        <div id="mapa-leaflet"></div>
+        <div class="map-top-bar" id="mapa-lista"></div>
+        <div class="map-update" id="mapa-upd">Actualizando...</div>
+        <div style="position:absolute;bottom:12px;left:12px;z-index:1000;background:rgba(6,9,18,0.9);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;display:flex;gap:12px;align-items:center;" id="mapa-leyenda"></div>
+    </div>
+
+    <!-- AGENDA -->
+    <div class="view" id="view-agenda">
+        <div class="agenda-header-row">
+            <div>
+                <h1 class="agenda-title" id="agenda-titulo">Agenda</h1>
+                <p class="agenda-sub" id="agenda-sub-texto"></p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div id="agenda-live-badge" style="display:none;font-size:12px;color:var(--success);background:var(--success-bg);border:1px solid var(--success-border);border-radius:12px;padding:3px 10px;font-family:var(--mono);font-weight:700;">● LIVE</div>
+                <div class="agenda-view-toggle">
+                    <button class="agt-btn active" id="btn-semanal" onclick="setVistaAgenda('semanal',this)">SEMANAL</button>
+                    <button class="agt-btn" id="btn-quincenal" onclick="setVistaAgenda('quincenal',this)">QUINCENAL</button>
+                    <button class="agt-btn" id="btn-mensual" onclick="setVistaAgenda('mensual',this)">MENSUAL</button>
+                </div>
+                <button class="btn-sm" id="agenda-nav-prev" onclick="navAgenda(-1)">&#8592;</button>
+                <button class="btn-sm" id="agenda-nav-next" onclick="navAgenda(+1)">&#8594;</button>
+            </div>
+        </div>
+        <div id="agenda-container" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;"></div>
+    </div>
+
+    <!-- ADMIN -->
+    <div class="view" id="view-admin">
+        <div class="admin-wrap">
+            <div class="admin-header-row">
+                <div>
+                    <h1 style="font-size:22px;font-weight:800;letter-spacing:-0.02em;">Administrar Agenda</h1>
+                    <p style="font-size:12px;color:var(--text3);font-family:var(--mono);">Gestión de entregas programadas</p>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <select id="admin-semana-select" class="btn-sm" style="width:auto;" onchange="cambiarSemanaAdmin()">
+                        <option value="actual">Semana Actual</option>
+                        <option value="prox">Próxima Semana</option>
+                    </select>
+                    <button class="btn-sm" onclick="agregarHoy()">+ Agregar a Hoy</button>
+                    <button class="btn btn-primary" onclick="guardarAgenda()">💾 Guardar</button>
+                </div>
+            </div>
+            <div id="agenda-admin-list"></div>
+        </div>
+    </div>
+
+</div>
+
+  <script src="/static/script.js?v=2026"></script>
+</body>
+</html>
