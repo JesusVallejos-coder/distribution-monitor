@@ -206,25 +206,41 @@ def estado_movil_con_ruta(v, ruta_status, tiene_ordenes=False):
         return "detenido"
     return "inactivo"
 
-def _build_evolucion(ordenes):
-    horas = {str(h).zfill(2): {"entregados": 0, "no_entregados": 0, "parciales": 0} for h in range(6, 22)}
-    for o in ordenes:
-        s = (o.get("orderStatus") or {}).get("status")
-        ts = o.get("updatedAt") or o.get("createdAt") or ""
-        if not ts:
-            continue
-        try:
-            hora = datetime.fromisoformat(ts.replace("Z", "+00:00")).strftime("%H")
+def _build_evolucion(ordenes, rutas):
+    # Crear el diccionario de horas (0 a 23)
+    horas = {str(h).zfill(2): {"entregados": 0, "no_entregados": 0, "parciales": 0} for h in range(0, 24)}
+    
+    # Recorrer las rutas crudas (no las procesadas)
+    for r in rutas:
+        for wp in r.get("waypoints", []):
+            # Obtener el código de estado (2 = entregado, 1 = parcial, 0 = no entregado)
+            st_wp = wp.get("status") or {}
+            estado = st_wp.get("status") if isinstance(st_wp, dict) else None
+            
+            # Obtener la hora de visita
+            ts = wp.get("visitedAt")
+            if not ts or estado is None:
+                continue
+            
+            # Parsear la fecha y extraer la hora
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                hora = dt.strftime("%H")
+            except:
+                continue
+            
+            # Sumar en la hora correspondiente
             if hora in horas:
-                if s == 2:
+                if estado == 2:
                     horas[hora]["entregados"] += 1
-                elif s == 1:
+                elif estado == 1:
                     horas[hora]["parciales"] += 1
-                elif s == 0:
+                elif estado == 0:
                     horas[hora]["no_entregados"] += 1
-        except:
-            pass
-    acum, result = 0, []
+    
+    # Construir resultado acumulado
+    acum = 0
+    result = []
     for h, v in sorted(horas.items()):
         acum += v["entregados"]
         result.append({
@@ -476,7 +492,7 @@ def procesar_dashboard():
         "clientes": clientes,
         "mapa": mapa_vehiculos,
         "rutas": mapa_rutas,
-        "evolucion": _build_evolucion(ordenes),
+        "evolucion": _build_evolucion(ordenes, rutas),
         "alertas": _build_alertas(moviles, ordenes),
         "timestamp": datetime.now().strftime("%H:%M:%S"),
         "fecha": date.today().strftime("%d/%m/%Y")
