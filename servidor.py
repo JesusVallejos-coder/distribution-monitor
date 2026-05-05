@@ -41,8 +41,8 @@ def cargar_env():
 
 _env = cargar_env()
 
-QUADMINDS_API_KEY  = _env.get("QUADMINDS_API_KEY", "")
-QUADMINDS_BASE_URL = _env.get("QUADMINDS_BASE_URL", "https://saas.quadminds.com/api/v2")
+TMS_API_KEY  = _env.get("TMS_API_KEY", "")
+TMS_BASE_URL = _env.get("TMS_BASE_URL", "https://tms.com/api")
 PUERTO             = int(_env.get("PUERTO", 8080))
 ALLOWED_ORIGINS    = _env.get("ALLOWED_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080")  # orígenes separados por coma
 CACHE_VEHICULOS    = 30
@@ -97,18 +97,18 @@ def rate_ok(ip: str) -> bool:
     return True
 
 # ─────────────────────────────────────────
-#  QUADMINDS API (segura)
+#  TMS API (segura)
 # ─────────────────────────────────────────
 def qm_get(path: str, params: dict = None) -> Optional[dict]:
     """
-    Realiza una petición GET a la API de QuadMinds usando parámetros codificados.
+    Realiza una petición GET a la API del TMS usando parámetros codificados.
     """
-    url = f"{QUADMINDS_BASE_URL}/{path}"
+    url = f"{TMS_BASE_URL}/{path}"
     if params:
         url += "?" + urlencode(params)
     req = URLRequest(url, headers={
         "accept": "application/json",
-        "x-saas-apikey": QUADMINDS_API_KEY
+        "x-saas-apikey": TMS_API_KEY
     })
     try:
         with urlopen(req, timeout=10) as r:
@@ -783,8 +783,8 @@ app.mount("/", StaticFiles(directory=str(DIR_BASE), html=True), name="root_stati
 # ─────────────────────────────────────────
 def main():
     HIST_DIR.mkdir(exist_ok=True)
-    if not QUADMINDS_API_KEY:
-        print("\n  ⚠  ERROR: QUADMINDS_API_KEY no configurada en .env\n")
+    if not TMS_API_KEY:
+        print("\n  ⚠  ERROR: TMS_API_KEY no configurada en .env\n")
         return
     print(f"\n{'='*56}\n  Dashboard Operativo — Distribución v3 (Seguro)\n{'='*56}")
     print(f"  Monitor:   http://localhost:{PUERTO}/dashboard.html")
