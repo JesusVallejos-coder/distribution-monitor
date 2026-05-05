@@ -1,0 +1,44 @@
+# ─── Entorno virtual ──────────────────────────────────
+.venv/
+venv/
+env/
+
+# ─── Variables de entorno (contiene API KEY) ─────────
+.env
+
+# ─── Datos operativos / sensibles ────────────────────
+agenda.json
+agenda_prox.json
+agenda_mes.json
+datos.json
+historial/
+
+# ─── Caché de Python ─────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ─── Archivos de distribuciones / build ──────────────
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ─── IDE / VS Code (opcional) ────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ─── Sistema operativo ───────────────────────────────
+Thumbs.db
+.DS_Store
+*.bak
+*.swp
+*.tmp
+
+# ─── Logs ────────────────────────────────────────────
+*.log
+
+# ─── Base de datos local (si usaras SQLite) ──────────
+*.sqlite3
